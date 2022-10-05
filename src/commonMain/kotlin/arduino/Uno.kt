@@ -3,14 +3,44 @@ package fi.papinkivi.crap.arduino
 import fi.papinkivi.crap.*
 
 /** Arduino Uno revision 3 */
-class Uno(connection: Connection) : Controller('B') {
-    override val coder = ArduinoProtocol(connection)
+class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B') {
+    override val protocol = ArduinoProtocol(connection)
+
+    private val analogReferenceDefault by lazy { protocol.analogReference(Reference.Default) }
+    private val analogReferenceExternal by lazy { protocol.analogReference(Reference.External) }
+    private val analogReferenceInternal by lazy { protocol.analogReference(Reference.Internal) }
+    private val interruptsDisable by lazy { protocol.interrupts(false) }
+    private val interruptsEnable by lazy { protocol.interrupts(true) }
+    private val millis by lazy { protocol.millis() }
+    override val procedures by lazy { listOf(
+        millis,
+        interruptsDisable,
+        interruptsEnable,
+        analogReferenceDefault,
+        analogReferenceExternal,
+        analogReferenceInternal
+    ) + super.procedures }
+
+    /** Overflow after 50 days. */
+    val uptime get() = millis()
 
     /** Are interrupts enabled */
-    var ints: Boolean = true // TODO
+    var ints = true
+        set(value) {
+            field = value
+            if (value) interruptsEnable() else interruptsDisable()
+        }
 
     /** a reference voltage on analog pins. */
-    var ref = Reference.Default // TODO
+    var ref = Reference.Default
+        set(value) {
+            field = value
+            when (value) {
+                Reference.Default -> analogReferenceDefault()
+                Reference.External -> analogReferenceExternal()
+                Reference.Internal -> analogReferenceInternal()
+            }
+        }
 
     //#region Ports
     val pb = port()
@@ -71,6 +101,8 @@ class Uno(connection: Connection) : Controller('B') {
     val a4 = pc.analog("SDA")
     val a5 = pc.analog("SCL")
     //#endregion
+
+    fun buildSketch() = protocol.buildSketch(this)
 }
 
 /** The reference voltage used for analog input (i.e. the value used as the top of the input range). */
