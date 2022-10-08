@@ -44,13 +44,16 @@ class UnoTest : FunSpec({
         }
     }
     context("procedure") {
-        test("count") { uno.procedures shouldHaveSize 120 }
+        test("count") { uno.procedures shouldHaveSize TOTAL_PROCEDURES }
+        test("duplicate") { uno.procedures.distinctBy { it.index } shouldHaveSize TOTAL_PROCEDURES }
+        test("last") { uno.procedures.maxBy { it.index }.index shouldBe (TOTAL_PROCEDURES - 1) }
     }
     test("sketch") {
         uno.buildSketch() shouldBe File("src/assembly/uno/uno.ino").readText()
     }
 }) {
     companion object {
+        const val TOTAL_PROCEDURES = 245
         val uno = Uno()
     }
 }

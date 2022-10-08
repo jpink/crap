@@ -4,18 +4,34 @@
 package fi.papinkivi.crap
 
 open class Connection {
-    /*fun call(procedure: Proc): Connection { TODO remove
-        write(procedure.code)
-        return this
-    }*/
-    protected open fun read(): Byte = 0
-    fun readUShort(): UShort = TODO()
-    private fun write(char: Char) = write(char.code.toByte())
-    protected open fun write(byte: Byte) {}
+    open val connected = false
+
+    open fun flush() {}
+
+    fun readBoolean() = readByte().boolean
+
+    open fun readByte(): Byte = 0
+
+    protected open fun readBytes(bytes: Int) = ByteArray(bytes) { readByte() }
+
+    fun readInt() = readBytes(4).int
+
+    fun readUInt() = readBytes(4).uInt
+
+    fun readUShort() = readBytes(2).uShort
+
+    fun writeBoolean(value: Boolean) = writeByte(value.byte)
+
+    open fun writeByte(value: Byte) {}
+
+    protected open fun writeBytes(buffer: ByteArray) = buffer.forEach(this::writeByte)
+
+    fun writeInt(value: Int) { writeBytes(value.bytes) }
 }
 
 /** Microcontroller */
 abstract class Controller(val model: String, private var nextPort: Char = 'A') {
+    val connected get() = protocol.connection.connected
     abstract val protocol: Protocol
     val pins = mutableListOf<DigitalPin>()
     val ports = mutableMapOf<Char, Port>()
@@ -28,6 +44,16 @@ class DataLink(val clock: DigitalPin, val data: DigitalPin, val msb: Boolean) {
     var shift: Byte
         get() { TODO() }
         set(value) = TODO()
+}
+
+class Loopback : Connection() {
+    private val buffer = mutableListOf<Byte>()
+
+    override val connected = true
+
+    override fun readByte() = buffer.removeFirst()
+
+    override fun writeByte(value: Byte) { buffer.add(value) }
 }
 
 class Port(val controller: Controller, val code: Char) {

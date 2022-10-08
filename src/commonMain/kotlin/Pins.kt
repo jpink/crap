@@ -37,18 +37,40 @@ open class DigitalPin(
     val portLabel = "$port$portNo"
 
     private val digitalRead by lazy { protocol.digitalRead(this) }
-    private val digitalWriteHigh by lazy { protocol.digitalWrite(this, true) }
-    private val digitalWriteLow by lazy { protocol.digitalWrite(this, false) }
+    protected val digitalWriteHigh by lazy { protocol.digitalWrite(this, true) }
+    protected val digitalWriteLow by lazy { protocol.digitalWrite(this, false) }
+    private val noTone by lazy { protocol.noTone(this) }
     private val pinModeInput by lazy { protocol.pinMode(this, Mode.Input) }
     private val pinModeInputPullUp by lazy { protocol.pinMode(this, Mode.InputPullUp) }
-    private val pinModeInputOutput by lazy { protocol.pinMode(this, Mode.Output) }
+    private val pinModeOutput by lazy { protocol.pinMode(this, Mode.Output) }
+    private val pulseInHigh by lazy { protocol.pulseIn(this, true) }
+    private val pulseInHighTimeout by lazy { protocol.pulseInTimeout(this, true) }
+    private val pulseInLongHigh by lazy { protocol.pulseInLong(this, true) }
+    private val pulseInLongHighTimeout by lazy { protocol.pulseInLongTimeout(this, true) }
+    private val pulseInLongLow by lazy { protocol.pulseInLong(this, false) }
+    private val pulseInLongLowTimeout by lazy { protocol.pulseInLongTimeout(this, false) }
+    private val pulseInLow by lazy { protocol.pulseIn(this, false) }
+    private val pulseInLowTimeout by lazy { protocol.pulseInTimeout(this, false) }
+    private val tone by lazy { protocol.tone(this) }
+    private val toneDuration by lazy { protocol.toneDuration(this) }
     open val procedures by lazy { if (reserved != null) emptyList() else listOf(
         digitalRead,
         digitalWriteHigh,
         digitalWriteLow,
+        noTone,
+        pulseInHigh,
+        pulseInLow,
+        pulseInHighTimeout,
+        pulseInLowTimeout,
+        //pulseInLongHigh,
+        //pulseInLongLow,
+        //pulseInLongHighTimeout,
+        //pulseInLongLowTimeout,
         pinModeInput,
         pinModeInputPullUp,
-        pinModeInputOutput
+        pinModeOutput,
+        tone,
+        toneDuration
     ) }
 
     var mode = Mode.Input
@@ -58,7 +80,7 @@ open class DigitalPin(
             when (value) {
                 Mode.Input -> pinModeInput()
                 Mode.InputPullUp -> pinModeInputPullUp()
-                Mode.Output -> pinModeInputOutput()
+                Mode.Output -> pinModeOutput()
             }
         }
 
@@ -73,11 +95,7 @@ open class DigitalPin(
             else digitalWriteLow()
         }
 
-    private fun callable() { reserved?.let { throw IllegalStateException("Pin $this is reserved for $it!") } }
-
-    fun noTone() {
-        TODO()
-    }
+    protected fun callable() { reserved?.let { throw IllegalStateException("Pin $this is reserved for $it!") } }
 
     fun pulseIn(
         /** Detect high pulse */
@@ -90,8 +108,12 @@ open class DigitalPin(
         long: Boolean = false
     ): Duration? = TODO()
 
-    fun tone(frequency: UShort, duration: Duration? = null) {
-        TODO()
+    fun tone(frequency: Int = 0, duration: Duration? = null) {
+        if (frequency < 31) noTone()
+        else {
+            tone()
+            TODO()
+        }
     }
 }
 
@@ -102,20 +124,27 @@ interface HasInterrupt {
 
 class InterruptPin(port: Port, portNo: Int, label: String) : DigitalPin(port, portNo, label), HasInterrupt {
     override var trigger: Trigger?
-        get() = TODO("Not yet implemented")
+        get() = TODO()
         set(value) {}
 }
 
 class InterruptPwmPin(port: Port, portNo: Int, label: String) : PwmPin(port, portNo, label), HasInterrupt {
     override var trigger: Trigger?
-        get() = TODO("Not yet implemented")
+        get() = TODO()
         set(value) {}
 }
 
 /** A pin with built-in LED capability */
 class LedPin(port: Port, portNo: Int, label: String, reserved: String? = null)
     : DigitalPin(port, portNo, label, reserved) {
-    var on by ::high
+    /** Used to change LED state only. Can't read the state! */
+    var on = false
+        set(value) {
+            callable()
+            field = value
+            if (value) digitalWriteHigh()
+            else digitalWriteLow()
+        }
 }
 
 /** Pin mode */

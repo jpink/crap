@@ -12,13 +12,15 @@ class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B')
     private val interruptsDisable by lazy { protocol.interrupts(false) }
     private val interruptsEnable by lazy { protocol.interrupts(true) }
     private val millis by lazy { protocol.millis() }
+    private val reconnect by lazy { protocol.reconnect() }
     override val procedures by lazy { listOf(
         millis,
-        interruptsDisable,
-        interruptsEnable,
+        //interruptsDisable,
+        //interruptsEnable,
         analogReferenceDefault,
         analogReferenceExternal,
-        analogReferenceInternal
+        analogReferenceInternal,
+        reconnect
     ) + super.procedures }
 
     /** Overflow after 50 days. */
@@ -28,6 +30,8 @@ class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B')
     var ints = true
         set(value) {
             field = value
+            throw UnsupportedOperationException("Doesn't compile inside of lambda: expected ')' before '::' token!")
+            @Suppress("UNREACHABLE_CODE")
             if (value) interruptsEnable() else interruptsDisable()
         }
 
@@ -40,6 +44,11 @@ class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B')
                 Reference.External -> analogReferenceExternal()
                 Reference.Internal -> analogReferenceInternal()
             }
+        }
+
+    var speed = 9600
+        set(value) {
+            field = reconnect(value)
         }
 
     //#region Ports
