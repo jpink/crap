@@ -2,26 +2,26 @@ package fi.papinkivi.crap.arduino
 
 import fi.papinkivi.crap.*
 
-/** Arduino Uno revision 3 */
-class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B') {
+/**
+ * Arduino Uno revision 3
+ *
+ * [Features](https://docs.arduino.cc/hardware/uno-rev3)
+ * [RX&TX LEDs](https://forum.arduino.cc/t/purpose-of-rx-and-tx-leds/318749/13)
+ */
+class Uno(connection: Connection = ConnectionFactory.default)
+    : Controller({}, ID, "Arduino UNO R3", 'B') {
+    constructor(descriptor: String) : this(ConnectionFactory(descriptor))
+    constructor(index: Int) : this(ConnectionFactory(index))
+
     override val protocol = ArduinoProtocol(connection)
 
     private val analogReferenceDefault by lazy { protocol.analogReference(Reference.Default) }
     private val analogReferenceExternal by lazy { protocol.analogReference(Reference.External) }
     private val analogReferenceInternal by lazy { protocol.analogReference(Reference.Internal) }
-    private val interruptsDisable by lazy { protocol.interrupts(false) }
-    private val interruptsEnable by lazy { protocol.interrupts(true) }
+    //private val interruptsDisable by lazy { protocol.interrupts(false) }
+    //private val interruptsEnable by lazy { protocol.interrupts(true) }
     private val millis by lazy { protocol.millis() }
     private val reconnect by lazy { protocol.reconnect() }
-    override val procedures by lazy { listOf(
-        millis,
-        //interruptsDisable,
-        //interruptsEnable,
-        analogReferenceDefault,
-        analogReferenceExternal,
-        analogReferenceInternal,
-        reconnect
-    ) + super.procedures }
 
     /** Overflow after 50 days. */
     val uptime get() = millis()
@@ -31,8 +31,7 @@ class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B')
         set(value) {
             field = value
             throw UnsupportedOperationException("Doesn't compile inside of lambda: expected ')' before '::' token!")
-            @Suppress("UNREACHABLE_CODE")
-            if (value) interruptsEnable() else interruptsDisable()
+            //if (value) interruptsEnable() else interruptsDisable()
         }
 
     /** a reference voltage on analog pins. */
@@ -47,8 +46,10 @@ class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B')
         }
 
     var speed = 9600
+        get() = connection.baud
         set(value) {
-            field = reconnect(value)
+            field = value
+            reconnect(value)
         }
 
     //#region Ports
@@ -58,18 +59,20 @@ class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B')
     //#endregion
 
     //#region Digital pins
-    /** USB Serial Receive (RX) */
-    val d0 = pd.led("RX", "USB serial receiving")
+    /** Reserved for USB Serial Receive (RX) */
+    val d0 = pd.pin("RX")
 
-    /** USB Serial Transmit (TX) */
-    val d1 = pd.led("TX", "USB serial transmitting")
+    /** Reserved for USB Serial Transmit (TX) */
+    val d1 = pd.pin("TX")
 
     val d2 = pd.interrupt()
 
     val d3 = pd.interruptPwm()
 
+    /** RX LED */
     val d4 = pd.digital()
 
+    /** TX LED */
     val d5 = pd.pwm()
 
     val d6 = pd.pwm()
@@ -90,15 +93,15 @@ class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B')
     val d12 = pb.digital("CIPO")
 
     /** Serial Clock (SCK) if Serial Peripheral Interface (SPI) used */
-    val d13 = pb.led("SCK")
+    val d13 = pb.digital("SCK")
 
     /** Built-in LED */
     val led = d13
 
-    /** Data line (SDA) if Wire is used */
+    /** Data line (SDA) if I2C is used */
     val d18 by lazy { a4 }
 
-    /** Clock line (SCL) if Wire is used */
+    /** Clock line (SCL) if I2C is used */
     val d19 by lazy { a5 }
     //#endregion
 
@@ -111,7 +114,23 @@ class Uno(connection: Connection = Connection()) : Controller("Uno rev. 3", 'B')
     val a5 = pc.analog("SCL")
     //#endregion
 
+    val reset = pc.pin("RESET")
+
+    init {
+        if (procedures.size != PROCEDURES)
+            throw IllegalStateException("Procedure count is ${procedures.size}, but expected to be $PROCEDURES!")
+        connect()
+    }
+
+    fun attach4RelayShield() = attach(FourRelayShield(this))
+
     fun buildSketch() = protocol.buildSketch(this)
+
+    companion object {
+        const val ID = "Uno3"
+        const val SKETCH = "src/assembly/$ID/$ID.ino"
+        const val PROCEDURES = 246
+    }
 }
 
 /** The reference voltage used for analog input (i.e. the value used as the top of the input range). */

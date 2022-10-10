@@ -5,5 +5,5 @@ import java.io.File
 fun main() {
     val sketch = Uno().buildSketch()
     println(sketch)
-    File("src/assembly/uno/uno.ino").writeText(sketch)
+    File(Uno.SKETCH).writeText(sketch)
 }

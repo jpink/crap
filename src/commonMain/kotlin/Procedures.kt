@@ -1,28 +1,41 @@
 package fi.papinkivi.crap
 
-import kotlin.time.Duration
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
+import kotlin.time.*
 
-sealed class Procedure(protected val connection: Connection, val index: Int, val syntax: String, val argBytes: Int) {
-    private val procedure = index.toByte()
+sealed class Procedure(val syntax: String, func: () -> Unit, val argBytes: Int = 0) : Logger(func) {
+    lateinit var connection: Connection
+    var index = -1
 
-    protected fun writeProcedure() = connection.writeByte(procedure)
+    init {
+        trace { "Created '$syntax'${if (argBytes == 0) "" else " requiring $argBytes bytes for arguments"}." }
+    }
+
+    val procedure by lazy {
+        if (index == -1) throw IllegalStateException("Index not assigned!")
+        index.toByte()
+    }
+
+    fun logCall(vararg args: Any) = debug { "Calling #$index '$syntax'${if (args.any()) "with arguments: ${args.joinToString()}" else '.'}" }
+
+    protected fun writeProcedure() {
+        connection.writeByte(procedure)
+    }
 
     protected fun flush() = connection.flush()
 }
 
-open class Call(protocol: Protocol, syntax: String, argBytes: Int = 0)
-    : Procedure(protocol.connection, protocol.id(argBytes), syntax, argBytes) {
+/** TODO merge with procedure */
+class Call(syntax: String) : Procedure(syntax, {}) {
     operator fun invoke() {
+        logCall()
         writeProcedure()
         flush()
     }
 }
 
-abstract class Get<R>(protocol: Protocol, syntax: String, argBytes: Int = 0)
-    : Procedure(protocol.connection, protocol.id(argBytes), syntax, argBytes) {
+abstract class Get<R>(syntax: String, func: () -> Unit, argBytes: Int = 0) : Procedure(syntax, func, argBytes) {
     operator fun invoke(): R {
+        logCall()
         writeProcedure()
         flush()
         return read()
@@ -31,9 +44,76 @@ abstract class Get<R>(protocol: Protocol, syntax: String, argBytes: Int = 0)
     abstract fun read(): R
 }
 
-abstract class To<R, P>(protocol: Protocol, syntax: String, argBytes: Int = 1)
-    : Procedure(protocol.connection, protocol.id(argBytes), syntax, argBytes) {
-    operator fun invoke(arg: P): R {
+abstract class Get2<R>(syntax: String, func: () -> Unit) : Get<R>(syntax, func)
+
+abstract class Get4<R>(syntax: String, func: () -> Unit, argBytes: Int) : Get<R>(syntax, func, argBytes)
+
+class GetBoolean(syntax: String) : Get<Boolean>(syntax, {}) {
+    override fun read() = connection.readBoolean()
+}
+
+abstract class GetDuration(syntax: String, func: () -> Unit, argBytes: Int, private val unit: DurationUnit)
+    : Get4<Duration>(syntax, func, argBytes) {
+    override fun read() = connection.readUInt().toLong().toDuration(unit)
+}
+
+class GetMicros(syntax: String, argBytes: Int) : GetDuration(syntax, {}, argBytes, DurationUnit.MICROSECONDS)
+
+class GetMillis(syntax: String) : GetDuration(syntax, {}, 0, DurationUnit.MILLISECONDS)
+
+class GetUShort(syntax: String) : Get2<UShort>(syntax, {}) {
+    override fun read() = connection.readUShort()
+}
+
+class IntToString(syntax: String) : To<String, Int>(syntax, {}, 4) {
+    override fun read() = connection.readLine()
+
+    override fun write(arg: Int) = connection.writeInt(arg)
+}
+
+abstract class Set<A : Any>(syntax: String, func: () -> Unit, argBytes: Int) : Procedure(syntax, func, argBytes) {
+    operator fun invoke(arg: A) {
+        logCall(arg)
+        writeProcedure()
+        write(arg)
+        flush()
+    }
+
+    abstract fun write(arg: A)
+}
+
+abstract class Set2<A1 : Any, A2 : Any>(syntax: String, func: () -> Unit, argBytes: Int)
+    : Procedure(syntax, func, argBytes) {
+    operator fun invoke(arg1: A1, arg2: A2) {
+        logCall(arg1, arg2)
+        writeProcedure()
+        write1(arg1)
+        write2(arg2)
+        flush()
+    }
+
+    abstract fun write1(arg1: A1)
+
+    abstract fun write2(arg2: A2)
+}
+
+class SetByte(syntax: String) : Set<Byte>(syntax, {}, 1) {
+    override fun write(arg: Byte) = connection.writeByte(arg)
+}
+
+class SetShort(syntax: String) : Set<Short>(syntax, {}, 2) {
+    override fun write(arg: Short) = connection.writeShort(arg)
+}
+
+class SetShortAndInt(syntax: String) : Set2<Short, Int>(syntax, {}, 6) {
+    override fun write1(arg1: Short) = connection.writeShort(arg1)
+
+    override fun write2(arg2: Int) = connection.writeInt(arg2)
+}
+
+abstract class To<R, A : Any>(syntax: String, func: () -> Unit, argBytes: Int = 1) : Procedure(syntax, func, argBytes) {
+    operator fun invoke(arg: A): R {
+        logCall(arg)
         writeProcedure()
         write(arg)
         flush()
@@ -42,33 +122,5 @@ abstract class To<R, P>(protocol: Protocol, syntax: String, argBytes: Int = 1)
 
     abstract fun read(): R
 
-    abstract fun write(arg: P)
-}
-
-abstract class Get2<R>(protocol: Protocol, syntax: String) : Get<R>(protocol, syntax)
-
-abstract class Get4<R>(protocol: Protocol, syntax: String, argBytes: Int) : Get<R>(protocol, syntax, argBytes)
-
-class GetBoolean(protocol: Protocol, syntax: String) : Get<Boolean>(protocol, syntax) {
-    override fun read() = connection.readBoolean()
-}
-
-abstract class GetDuration(protocol: Protocol, syntax: String, argBytes: Int, private val unit: DurationUnit)
-    : Get4<Duration>(protocol, syntax, argBytes) {
-    override fun read() = connection.readUInt().toLong().toDuration(unit)
-}
-
-class GetMicros(protocol: Protocol, syntax: String, argBytes: Int)
-    : GetDuration(protocol, syntax, argBytes, DurationUnit.MICROSECONDS)
-
-class GetMillis(protocol: Protocol, syntax: String) : GetDuration(protocol, syntax, 0, DurationUnit.MILLISECONDS)
-
-class GetUShort(protocol: Protocol, syntax: String) : Get2<UShort>(protocol, syntax) {
-    override fun read() = connection.readUShort()
-}
-
-class IntToInt(protocol: Protocol, syntax: String) : To<Int, Int>(protocol, syntax, 4) {
-    override fun read() = connection.readInt()
-
-    override fun write(arg: Int) = connection.writeInt(arg)
+    abstract fun write(arg: A)
 }

@@ -1,7 +1,6 @@
 package fi.papinkivi.crap.arduino
 
 import fi.papinkivi.crap.*
-import io.kotest.assertions.throwables.shouldThrowUnit
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.maps.shouldHaveSize
@@ -9,14 +8,15 @@ import io.kotest.matchers.shouldBe
 import java.io.File
 
 class UnoTest : FunSpec({
+    test("buildSketch") { uno.buildSketch() shouldBe File(Uno.SKETCH).readText() }
     context("pin") {
         context("constant") {
-            test("A3") { uno.a3.constant shouldBe "A3" }
-            test("A4") { uno.a4.constant shouldBe "A4" }
-            test("D0") { uno.d0.constant shouldBe "0" }
-            test("D3") { uno.d3.constant shouldBe "3" }
-            test("D4") { uno.d4.constant shouldBe "4" }
-            test("D10") { uno.d10.constant shouldBe "10" }
+            test("A3") { uno.a3.id shouldBe "A3" }
+            test("A4") { uno.a4.id shouldBe "A4" }
+            test("D0") { uno.d0.id shouldBe "0" }
+            test("D3") { uno.d3.id shouldBe "3" }
+            test("D4") { uno.d4.id shouldBe "4" }
+            test("D10") { uno.d10.id shouldBe "10" }
         }
         context("label") {
             test("A3") { uno.a3 stringBe "A3 D17" }
@@ -29,31 +29,23 @@ class UnoTest : FunSpec({
         context("portLabel") {
             test("D1") { uno.d1.portLabel shouldBe "PD1" }
         }
-        context("reserved") {
-            test("D0") { shouldThrowUnit<IllegalStateException> { uno.d0.high = true } }
-            test("D1") { shouldThrowUnit<IllegalStateException> { uno.d1.high = true } }
-        }
     }
     context("port") {
         test("count") { uno.ports shouldHaveSize 3 }
-        test("PD") { uno.pd.name shouldBe "PD" }
+        test("PD") { uno.pd.id shouldBe "PD" }
         context("pins") {
-            test("PB") { uno.pb.pins shouldBe 6 }
-            test("PC") { uno.pc.pins shouldBe 6 }
-            test("PD") { uno.pd.pins shouldBe 8 }
+            test("PB") { uno.pb.pinCount shouldBe 6 }
+            test("PC") { uno.pc.pinCount shouldBe 7 }
+            test("PD") { uno.pd.pinCount shouldBe 8 }
         }
     }
     context("procedure") {
-        test("count") { uno.procedures shouldHaveSize TOTAL_PROCEDURES }
-        test("duplicate") { uno.procedures.distinctBy { it.index } shouldHaveSize TOTAL_PROCEDURES }
-        test("last") { uno.procedures.maxBy { it.index }.index shouldBe (TOTAL_PROCEDURES - 1) }
-    }
-    test("sketch") {
-        uno.buildSketch() shouldBe File("src/assembly/uno/uno.ino").readText()
+        test("count") { uno.procedures shouldHaveSize Uno.PROCEDURES }
+        test("duplicate") { uno.procedures.distinctBy { it.syntax } shouldHaveSize Uno.PROCEDURES }
+        test("last") { uno.procedures.maxBy { it.index }.index shouldBe (Uno.PROCEDURES - 1) }
     }
 }) {
     companion object {
-        const val TOTAL_PROCEDURES = 245
         val uno = Uno()
     }
 }

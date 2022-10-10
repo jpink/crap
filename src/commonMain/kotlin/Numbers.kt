@@ -1,5 +1,7 @@
 package fi.papinkivi.crap
 
+val Byte.hex get() = "%02x".format(this)
+
 /**
  * Add integer bytes to existing array.
  *
@@ -8,6 +10,8 @@ package fi.papinkivi.crap
 fun ByteArray.add(value: Int, offset: Int = 0) {
     for (index in 0..3) set(offset + index, value.shr(8 * index).toByte())
 }
+
+val ByteArray.hex get() = joinToString(" ") { it.hex }
 
 val ByteArray.int get() = (get(3).toInt() shl 24) or
         (get(2).toInt() and 0xff shl 16) or

@@ -5,11 +5,8 @@ package fi.papinkivi.crap
 
 import kotlin.time.Duration
 
-class AnalogPin(port: Port, portNo: Int, label: String) : DigitalPin(port, portNo, label) {
-    private val analogRead by lazy { protocol.analogRead(this) }
-    override val procedures by lazy { super.procedures + analogRead }
-
-    override val constant = label.substringBefore(' ')
+class AnalogPin(port: Port, label: String) : DigitalPin(port, label, {}, "A${port.pinCount}") {
+    private val analogRead = protocol.analogRead(id)
 
     /** Integer value (between 0 and 1023 in Arduino) */
     val value get() = analogRead()
@@ -20,62 +17,35 @@ open class DigitalPin(
     /** Pin port */
     port: Port,
 
-    portNo: Int,
-
     label: String,
 
-    /** Allow remote control */
-    private val reserved: String? = null
-) : Pin(label) {
-    open val constant = label.substringAfter('D').substringBefore('/')
+    func: () -> Unit = {},
 
+    id: String = port.controllerPinCount.toString()
+) : Pin(port, label, func, id) {
     protected val protocol = port.controller.protocol
 
-    /** Default usage abbreviation */
-    val default = label.substringAfter('/')
+    private val digitalRead = protocol.digitalRead(id)
+    protected val digitalWriteHigh = protocol.digitalWrite(id, true)
+    protected val digitalWriteLow = protocol.digitalWrite(id, false)
+    private val noTone = protocol.noTone(id)
+    private val pinModeInput = protocol.pinMode(id, Mode.Input)
+    private val pinModeInputPullUp = protocol.pinMode(id, Mode.InputPullUp)
+    private val pinModeOutput = protocol.pinMode(id, Mode.Output)
+    private val pulseInHigh = protocol.pulseIn(id, true)
+    private val pulseInHighTimeout = protocol.pulseInTimeout(id, true)
+    //private val pulseInLongHigh = protocol.pulseInLong(id, true)
+    //private val pulseInLongHighTimeout = protocol.pulseInLongTimeout(id, true)
+    //private val pulseInLongLow = protocol.pulseInLong(id, false)
+    //private val pulseInLongLowTimeout = protocol.pulseInLongTimeout(id, false)
+    private val pulseInLow = protocol.pulseIn(id, false)
+    private val pulseInLowTimeout = protocol.pulseInTimeout(id, false)
+    private val tone = protocol.tone(id)
+    private val toneDuration = protocol.toneDuration(id)
 
-    val portLabel = "$port$portNo"
-
-    private val digitalRead by lazy { protocol.digitalRead(this) }
-    protected val digitalWriteHigh by lazy { protocol.digitalWrite(this, true) }
-    protected val digitalWriteLow by lazy { protocol.digitalWrite(this, false) }
-    private val noTone by lazy { protocol.noTone(this) }
-    private val pinModeInput by lazy { protocol.pinMode(this, Mode.Input) }
-    private val pinModeInputPullUp by lazy { protocol.pinMode(this, Mode.InputPullUp) }
-    private val pinModeOutput by lazy { protocol.pinMode(this, Mode.Output) }
-    private val pulseInHigh by lazy { protocol.pulseIn(this, true) }
-    private val pulseInHighTimeout by lazy { protocol.pulseInTimeout(this, true) }
-    private val pulseInLongHigh by lazy { protocol.pulseInLong(this, true) }
-    private val pulseInLongHighTimeout by lazy { protocol.pulseInLongTimeout(this, true) }
-    private val pulseInLongLow by lazy { protocol.pulseInLong(this, false) }
-    private val pulseInLongLowTimeout by lazy { protocol.pulseInLongTimeout(this, false) }
-    private val pulseInLow by lazy { protocol.pulseIn(this, false) }
-    private val pulseInLowTimeout by lazy { protocol.pulseInTimeout(this, false) }
-    private val tone by lazy { protocol.tone(this) }
-    private val toneDuration by lazy { protocol.toneDuration(this) }
-    open val procedures by lazy { if (reserved != null) emptyList() else listOf(
-        digitalRead,
-        digitalWriteHigh,
-        digitalWriteLow,
-        noTone,
-        pulseInHigh,
-        pulseInLow,
-        pulseInHighTimeout,
-        pulseInLowTimeout,
-        //pulseInLongHigh,
-        //pulseInLongLow,
-        //pulseInLongHighTimeout,
-        //pulseInLongLowTimeout,
-        pinModeInput,
-        pinModeInputPullUp,
-        pinModeOutput,
-        tone,
-        toneDuration
-    ) }
-
-    var mode = Mode.Input
+    var mode = Mode.Input // Arduino (Atmega) pins default to inputs
         set(value) {
-            callable()
+            if (field == value) return
             field = value
             when (value) {
                 Mode.Input -> pinModeInput()
@@ -84,18 +54,22 @@ open class DigitalPin(
             }
         }
 
-    var high: Boolean
+    var high = false
         get() {
-            callable()
-            return digitalRead()
+            if (mode != Mode.Output) field = digitalRead()
+            return field
         }
         set(value) {
-            callable()
-            if (value) digitalWriteHigh()
-            else digitalWriteLow()
+            if (mode != Mode.Output || field == value) return
+            field = value
+            if (value) {
+                info { "Changing $this state to HIGH." }
+                digitalWriteHigh()
+            } else {
+                info { "Changing $this state to LOW." }
+                digitalWriteLow()
+            }
         }
-
-    protected fun callable() { reserved?.let { throw IllegalStateException("Pin $this is reserved for $it!") } }
 
     fun pulseIn(
         /** Detect high pulse */
@@ -105,7 +79,7 @@ open class DigitalPin(
         timeout: Duration? = null,
 
         /** Use better handling for long pulse and interrupt affected scenarios */
-        long: Boolean = false
+        //long: Boolean = false
     ): Duration? = TODO()
 
     fun tone(frequency: Int = 0, duration: Duration? = null) {
@@ -122,29 +96,16 @@ interface HasInterrupt {
     var trigger: Trigger?
 }
 
-class InterruptPin(port: Port, portNo: Int, label: String) : DigitalPin(port, portNo, label), HasInterrupt {
+class InterruptPin(port: Port, label: String) : DigitalPin(port, label, {}), HasInterrupt {
     override var trigger: Trigger?
         get() = TODO()
         set(value) {}
 }
 
-class InterruptPwmPin(port: Port, portNo: Int, label: String) : PwmPin(port, portNo, label), HasInterrupt {
+class InterruptPwmPin(port: Port, label: String) : PwmPin(port, label, {}), HasInterrupt {
     override var trigger: Trigger?
         get() = TODO()
         set(value) {}
-}
-
-/** A pin with built-in LED capability */
-class LedPin(port: Port, portNo: Int, label: String, reserved: String? = null)
-    : DigitalPin(port, portNo, label, reserved) {
-    /** Used to change LED state only. Can't read the state! */
-    var on = false
-        set(value) {
-            callable()
-            field = value
-            if (value) digitalWriteHigh()
-            else digitalWriteLow()
-        }
 }
 
 /** Pin mode */
@@ -155,18 +116,40 @@ enum class Mode(val arduino: String) {
     Output("OUTPUT")
 }
 
-abstract class Pin(private val label: String) {
+open class Pin(
+    /** Pin port */
+    port: Port,
+
+    /** Text in board */
+    private val label: String,
+
+    func: () -> Unit = {},
+
+    /** Value or constant name in C++ code. */
+    val id: String = port.controllerPinCount.toString(),
+) : Logger(func) {
+    /** Default usage abbreviation */
+    val default = label.substringAfter('/')
+
+    val portLabel = "$port${port.pinCount}"
+
+    init {
+        trace {"Creating $label with code $id." }
+    }
+
     override fun toString() = label
 }
 
 /** A pin with pulse-width modulation (PWM) capability */
-open class PwmPin(
-    port: Port,
-    portNo: Int,
-    label: String
-) : DigitalPin(port, portNo, label) {
+open class PwmPin(port: Port, label: String, func: () -> Unit = {}) : DigitalPin(port, label, func) {
+    private val analogWrite = protocol.analogWrite(id)
+
     /** the duty cycle: between 0 (always off) and 255 (always on). */
     var cycle: UByte = 0.toUByte()
+        set(value) {
+            field = value
+            analogWrite(value.toByte())
+        }
 }
 
 /** Interrupt trigger */
@@ -183,5 +166,3 @@ enum class Trigger {
     /** when the pin goes from low to high */
     Rising
 }
-
-class TriggerDelegate

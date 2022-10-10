@@ -5,35 +5,41 @@ import fi.papinkivi.crap.arduino.Reference
 interface Protocol {
     val connection: Connection
 
-    fun analogRead(pin: AnalogPin): GetUShort
+    val procedures: List<Procedure>
+
+    val tag: String
+
+    val version: Int
+
+    fun analogRead(pin: String): GetUShort
 
     fun analogReference(reference: Reference): Call
 
-    fun digitalRead(pin: DigitalPin): GetBoolean
+    fun analogWrite(pin: String): SetByte
 
-    fun digitalWrite(pin: DigitalPin, high: Boolean): Call
+    fun digitalRead(pin: String): GetBoolean
 
-    fun id(argBytes: Int): Int
+    fun digitalWrite(pin: String, high: Boolean): Call
 
     fun interrupts(enable: Boolean): Call
 
     fun millis(): GetMillis
 
-    fun noTone(pin: DigitalPin): Call
+    fun noTone(pin: String): Call
 
-    fun pinMode(pin: DigitalPin, mode: Mode): Call
+    fun pinMode(pin: String, mode: Mode): Call
 
-    fun reconnect(): IntToInt
+    fun reconnect(): IntToString
 
-    fun pulseIn(pin: DigitalPin, high: Boolean): GetMicros
+    fun pulseIn(pin: String, high: Boolean): GetMicros
 
-    fun pulseInLong(pin: DigitalPin, high: Boolean): GetMicros
+    fun pulseInLong(pin: String, high: Boolean): GetMicros
 
-    fun pulseInLongTimeout(pin: DigitalPin, high: Boolean): GetMicros
+    fun pulseInLongTimeout(pin: String, high: Boolean): GetMicros
 
-    fun pulseInTimeout(pin: DigitalPin, high: Boolean): GetMicros
+    fun pulseInTimeout(pin: String, high: Boolean): GetMicros
 
-    fun tone(pin: DigitalPin) : Call
+    fun tone(pin: String) : SetShort
 
-    fun toneDuration(pin: DigitalPin) : Call
+    fun toneDuration(pin: String) : SetShortAndInt
 }
