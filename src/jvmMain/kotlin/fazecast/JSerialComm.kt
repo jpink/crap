@@ -20,7 +20,7 @@ open class NonBlockingConnection(protected val port: SerialPort, func: () -> Uni
 
     override fun readBytes(bytes: Int) : ByteArray {
         while (available < bytes) {
-            warn { "Sleeping $SLEEP_MS ms because $bytes bytes needed, but only $available available." }
+            trace { "Sleeping $SLEEP_MS ms because $bytes bytes needed, but only $available available." }
             Thread.sleep(SLEEP_MS)
         }
         val buffer = ByteArray(bytes)
@@ -35,7 +35,7 @@ open class NonBlockingConnection(protected val port: SerialPort, func: () -> Uni
         var more = true
         while (more) {
             while (available == 0) {
-                warn { "Sleeping $SLEEP_MS ms because no characters available." }
+                trace { "Sleeping $SLEEP_MS ms because no characters available." }
                 Thread.sleep(SLEEP_MS)
             }
             val buffer = ByteArray(available)

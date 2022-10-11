@@ -3,7 +3,8 @@
  */
 package fi.papinkivi.crap
 
-import fi.papinkivi.crap.arduino.Shield
+import fi.papinkivi.crap.module.Module
+import fi.papinkivi.crap.module.OneWireDevice
 
 abstract class AbstractConnectionFactory(func: () -> Unit) : Logger(func) {
     open val default get() = noOp
@@ -60,6 +61,8 @@ open class Connection(func: () -> Unit = {}) : Logger(func) {
         return line.toString().trimEnd()
     }
 
+    fun readShort() = readBytes(2).short
+
     fun readUInt() = readBytes(4).uInt
 
     fun readUShort() = readBytes(2).uShort
@@ -84,6 +87,14 @@ abstract class Controller(func: () -> Unit, val id: String, private val model: S
 
     val connection get() = protocol.connection
 
+    abstract val dallasCelsius: ByteToCelsius
+
+    /** 1-wire bus pin. */
+    abstract var oneWireBus: DigitalPin?
+
+    /** Devices attached to 1-wire bus. */
+    val oneWireDevices = mutableListOf<OneWireDevice>()
+
     abstract val protocol: Protocol
 
     val pins = mutableListOf<Pin>()
@@ -93,13 +104,12 @@ abstract class Controller(func: () -> Unit, val id: String, private val model: S
 
     val procedures get() = protocol.procedures
 
-    val shields = mutableListOf<Shield>()
+    val modules = mutableListOf<Module>()
 
-    protected fun <S : Shield> attach(shield: S): S {
-        info { "Attaching $shield" }
-        shields.add(shield)
-        shield.setup()
-        return shield
+    protected fun <M : Module> attach(module: M) = module.apply {
+        info { "Attaching $this" }
+        modules.add(this)
+        setup()
     }
 
     fun add(pin: Pin) {

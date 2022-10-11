@@ -1,15 +1,9 @@
 package fi.papinkivi.crap.arduino
 
 import fi.papinkivi.crap.*
+import fi.papinkivi.crap.module.*
 
-abstract class Shield(protected val controller: Controller, private val label: String, func: () -> Unit)
-    : Logger(func) {
-    open fun setup() {
-        trace { "Setup" }
-    }
-
-    override fun toString() = label
-}
+abstract class Shield(protected val controller: Controller, label: String, func: () -> Unit) : Module(label, func)
 
 abstract class RelayShield(controller: Controller, label: String, pins: IntProgression, func: () -> Unit)
     : Shield(controller, label, func) {
@@ -21,7 +15,7 @@ abstract class RelayShield(controller: Controller, label: String, pins: IntProgr
 
     fun relay(pin: Int = pins[relays.size]) = Relay(
         "J$nextNo",
-        "RELAY$nextNo",
+        "Relay$nextNo",
         controller.pinsById.getValue(pin.toString()) as DigitalPin
     ).apply { relays.add(this) }
 
@@ -45,31 +39,4 @@ class FourRelayShield(controller: Controller)
 
     /** Relay 4 */
     val j4 = relay()
-}
-
-class Relay(val id: String, private val label: String, private val pin: DigitalPin) : Logger({}) {
-    var active = false
-        set(value) {
-            if (field == value) return
-            info { "${if (value) "Activating" else "Deactivating"} $this." }
-            field = value
-            pin.high = value
-        }
-
-    val nc get() = !active
-
-    val no get() = active
-
-    fun activate() { active = true }
-
-    fun change() { active = !active }
-
-    fun deactivate() { active = false }
-
-    fun setup() {
-        info { "Setup $this." }
-        pin.mode = Mode.Output
-    }
-
-    override fun toString() = label
 }

@@ -23,6 +23,8 @@ open class DigitalPin(
 
     id: String = port.controllerPinCount.toString()
 ) : Pin(port, label, func, id) {
+    val index = port.controllerPinCount.toByte()
+
     protected val protocol = port.controller.protocol
 
     private val digitalRead = protocol.digitalRead(id)
@@ -109,11 +111,10 @@ class InterruptPwmPin(port: Port, label: String) : PwmPin(port, label, {}), HasI
 }
 
 /** Pin mode */
-@Suppress("SpellCheckingInspection")
-enum class Mode(val arduino: String) {
-    Input("INPUT"),
-    InputPullUp("INPUT_PULLUP"),
-    Output("OUTPUT")
+enum class Mode {
+    Input,
+    InputPullUp,
+    Output
 }
 
 open class Pin(

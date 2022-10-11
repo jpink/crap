@@ -1,6 +1,7 @@
 package fi.papinkivi.crap.arduino
 
 import fi.papinkivi.crap.*
+import fi.papinkivi.crap.module.DallasTemperature
 
 /**
  * Arduino Uno revision 3
@@ -15,13 +16,15 @@ class Uno(connection: Connection = ConnectionFactory.default)
 
     override val protocol = ArduinoProtocol(connection)
 
-    private val analogReferenceDefault by lazy { protocol.analogReference(Reference.Default) }
-    private val analogReferenceExternal by lazy { protocol.analogReference(Reference.External) }
-    private val analogReferenceInternal by lazy { protocol.analogReference(Reference.Internal) }
+    private val analogReferenceDefault = protocol.analogReference(Reference.Default)
+    private val analogReferenceExternal = protocol.analogReference(Reference.External)
+    private val analogReferenceInternal = protocol.analogReference(Reference.Internal)
+    override val dallasCelsius = protocol.dallasCelsius()
     //private val interruptsDisable by lazy { protocol.interrupts(false) }
     //private val interruptsEnable by lazy { protocol.interrupts(true) }
-    private val millis by lazy { protocol.millis() }
-    private val reconnect by lazy { protocol.reconnect() }
+    private val millis = protocol.millis()
+    private val reconnect = protocol.reconnect()
+    private val wire1 = protocol.wire1()
 
     /** Overflow after 50 days. */
     val uptime get() = millis()
@@ -32,6 +35,16 @@ class Uno(connection: Connection = ConnectionFactory.default)
             field = value
             throw UnsupportedOperationException("Doesn't compile inside of lambda: expected ')' before '::' token!")
             //if (value) interruptsEnable() else interruptsDisable()
+        }
+
+    /** 1-wire bus pin */
+    override var oneWireBus: DigitalPin? = null
+        set(value) {
+            if (value != null && value != field) {
+                info { "Begin 1-wire at $value pin." }
+                wire1(value.index)
+                field = value
+            }
         }
 
     /** a reference voltage on analog pins. */
@@ -124,12 +137,15 @@ class Uno(connection: Connection = ConnectionFactory.default)
 
     fun attach4RelayShield() = attach(FourRelayShield(this))
 
+    /** Creates, changes, uses existing or default D2 pin to set up 1-Wire. */
+    fun attachDallasTemperature(bus : DigitalPin? = null) = attach(DallasTemperature(this, bus))
+
     fun buildSketch() = protocol.buildSketch(this)
 
     companion object {
         const val ID = "Uno3"
         const val SKETCH = "src/assembly/$ID/$ID.ino"
-        const val PROCEDURES = 246
+        const val PROCEDURES = 253
     }
 }
 

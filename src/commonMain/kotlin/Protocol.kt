@@ -17,6 +17,8 @@ interface Protocol {
 
     fun analogWrite(pin: String): SetByte
 
+    fun dallasCelsius(): ByteToCelsius
+
     fun digitalRead(pin: String): GetBoolean
 
     fun digitalWrite(pin: String, high: Boolean): Call
@@ -29,8 +31,6 @@ interface Protocol {
 
     fun pinMode(pin: String, mode: Mode): Call
 
-    fun reconnect(): IntToString
-
     fun pulseIn(pin: String, high: Boolean): GetMicros
 
     fun pulseInLong(pin: String, high: Boolean): GetMicros
@@ -39,7 +39,11 @@ interface Protocol {
 
     fun pulseInTimeout(pin: String, high: Boolean): GetMicros
 
+    fun reconnect(): IntToString
+
     fun tone(pin: String) : SetShort
 
     fun toneDuration(pin: String) : SetShortAndInt
+
+    fun wire1(): SetByte
 }

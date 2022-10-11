@@ -2,26 +2,10 @@ package fi.papinkivi.crap
 
 import kotlin.time.*
 
-sealed class Procedure(val syntax: String, func: () -> Unit, val argBytes: Int = 0) : Logger(func) {
-    lateinit var connection: Connection
-    var index = -1
+class ByteToCelsius(syntax: String) : To<Float, Byte>(syntax, {}, 1) {
+    override fun read() = connection.readShort() / 100f
 
-    init {
-        trace { "Created '$syntax'${if (argBytes == 0) "" else " requiring $argBytes bytes for arguments"}." }
-    }
-
-    val procedure by lazy {
-        if (index == -1) throw IllegalStateException("Index not assigned!")
-        index.toByte()
-    }
-
-    fun logCall(vararg args: Any) = debug { "Calling #$index '$syntax'${if (args.any()) "with arguments: ${args.joinToString()}" else '.'}" }
-
-    protected fun writeProcedure() {
-        connection.writeByte(procedure)
-    }
-
-    protected fun flush() = connection.flush()
+    override fun write(arg: Byte) = connection.writeByte(arg)
 }
 
 /** TODO merge with procedure */
@@ -38,7 +22,7 @@ abstract class Get<R>(syntax: String, func: () -> Unit, argBytes: Int = 0) : Pro
         logCall()
         writeProcedure()
         flush()
-        return read()
+        return logResult(read())
     }
 
     abstract fun read(): R
@@ -69,6 +53,30 @@ class IntToString(syntax: String) : To<String, Int>(syntax, {}, 4) {
     override fun read() = connection.readLine()
 
     override fun write(arg: Int) = connection.writeInt(arg)
+}
+
+sealed class Procedure(val syntax: String, func: () -> Unit, val argBytes: Int = 0) : Logger(func) {
+    lateinit var connection: Connection
+    var index = -1
+
+    init {
+        trace { "Created '$syntax'${if (argBytes == 0) "" else " requiring $argBytes bytes for arguments"}." }
+    }
+
+    val procedure by lazy {
+        if (index == -1) throw IllegalStateException("Index not assigned!")
+        index.toByte()
+    }
+
+    fun logCall(vararg args: Any) = debug { "Calling #$index '$syntax'${if (args.any()) "with arguments: ${args.joinToString()}" else '.'}" }
+
+    fun <T> logResult(result: T) = result.apply { debug { "#$index resulted: $result" } }
+
+    protected fun writeProcedure() {
+        connection.writeByte(procedure)
+    }
+
+    protected fun flush() = connection.flush()
 }
 
 abstract class Set<A : Any>(syntax: String, func: () -> Unit, argBytes: Int) : Procedure(syntax, func, argBytes) {
@@ -117,7 +125,7 @@ abstract class To<R, A : Any>(syntax: String, func: () -> Unit, argBytes: Int = 
         writeProcedure()
         write(arg)
         flush()
-        return read()
+        return logResult(read())
     }
 
     abstract fun read(): R
