@@ -28,7 +28,7 @@ fun main() = Uno(1)                    // Connects Arduino Uno on 2nd serial.
         .loop { led.high = !led.high } // Changes its state on every second (by default).
 ```
 
-### Blink
+### Switch
 
 ```kotlin
 fun main() = Uno("COM3").setup {          // Uno is on COM3.
