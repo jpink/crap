@@ -1,4 +1,4 @@
-// Controller Remote Access Protocol (CRAP) version 1 sketch for Arduino UNO R3
+// Controller Remote Access Protocol (CRAP) version 2 sketch for Arduino UNO R3
 
 #include <OneWire.h> 
 #include <DallasTemperature.h>
@@ -48,7 +48,7 @@ void send4(long value) {    // Transmit four bytes back.
 void setup() {              // Begin serial connection. Used also for changing the speed.
   Serial.begin(speed);
   while (!Serial);
-  Serial.print("Uno3 crap1@");
+  Serial.print("Uno3 crap2@");
   Serial.println(speed);
 }
 

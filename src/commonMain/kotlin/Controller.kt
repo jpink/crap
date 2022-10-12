@@ -3,8 +3,10 @@
  */
 package fi.papinkivi.crap
 
-import fi.papinkivi.crap.module.Module
-import fi.papinkivi.crap.module.OneWireDevice
+import fi.papinkivi.crap.arduino.Uno
+import fi.papinkivi.crap.module.*
+import kotlin.system.measureTimeMillis
+import kotlin.time.Duration.Companion.seconds
 
 abstract class AbstractConnectionFactory(func: () -> Unit) : Logger(func) {
     open val default get() = noOp
@@ -39,6 +41,8 @@ open class Connection(func: () -> Unit = {}) : Logger(func) {
     open val connected = false
 
     open fun connect() = "Uno3 crap1@9600"
+
+    open fun disconnect() {}
 
     open fun flush() {}
 
@@ -81,13 +85,36 @@ expect object ConnectionFactory : AbstractConnectionFactory {
 }
 
 /** Microcontroller */
-abstract class Controller(func: () -> Unit, val id: String, private val model: String, private var nextPort: Char = 'A')
-    : Logger(func) {
+@Suppress("UNCHECKED_CAST")
+abstract class Controller<C>(
+    func: () -> Unit,
+    val id: String,
+    private val model: String,
+    private var nextPort: Char = 'A'
+) : Logger(func) {
     val connected get() = connection.connected
 
     val connection get() = protocol.connection
 
     abstract val dallasCelsius: ByteToCelsius
+
+    val freeAnalogPin get() = pins.first { it is AnalogPin && usedPins.getValue(it).isEmpty() } as AnalogPin
+
+    private val freeDigitalPin get() = pins.first { it is DigitalPin && usedPins.getValue(it).isEmpty() } as DigitalPin
+
+    private val freeDigitalOnlyPin get() = pins.firstOrNull {
+        it is DigitalPin && it !is PwmPin && it !is AnalogPin && usedPins.getValue(it).isEmpty() } as DigitalPin?
+
+    val freePin get() = freeDigitalOnlyPin ?: freeDigitalPin
+
+    val freePwmPin get() = pins.first { it is PwmPin && usedPins.getValue(it).isEmpty() } as PwmPin
+
+    val listeners = mutableListOf<() -> Unit>()
+
+    /** Minimum duration between loop iterations. Defaults to one second. */
+    var minLoop = 1.seconds
+
+    val modules = mutableListOf<Module>()
 
     /** 1-wire bus pin. */
     abstract var oneWireBus: DigitalPin?
@@ -100,24 +127,34 @@ abstract class Controller(func: () -> Unit, val id: String, private val model: S
     val pins = mutableListOf<Pin>()
     val pinsById = mutableMapOf<String, Pin>()
 
+    val pinOut: List<String> get() {
+        val maxIdLength = pins.maxOf { it.toString().length }
+        return usedPins.map { (pin, modules) -> "${pin.toString().padStart(maxIdLength)} = ${modules.joinToString()}" }
+    }
+
     val ports = mutableMapOf<Char, Port>()
 
     val procedures get() = protocol.procedures
 
-    val modules = mutableListOf<Module>()
+    private var setupDone = false
 
-    protected fun <M : Module> attach(module: M) = module.apply {
-        info { "Attaching $this" }
+    private var setupLambda: (C.() -> Unit)? = null
+
+    val usedPins = mutableMapOf<Pin, MutableList<Any>>()
+
+    fun <M : Module> attach(module: M) = module.apply {
+        if (setupDone) throw IllegalArgumentException("Attaching $module can't be done after setup phase!")
+        info { "Attached $this" }
         modules.add(this)
-        setup()
     }
 
     fun add(pin: Pin) {
         pins.add(pin)
         pinsById[pin.id] = pin
+        usedPins[pin] = mutableListOf()
     }
 
-    fun connect(): String {
+    private fun connect(): String {
         debug { "Connect" }
         val received = connection.connect()
         info { "Connected to '$received'." }
@@ -129,12 +166,54 @@ abstract class Controller(func: () -> Unit, val id: String, private val model: S
         return received
     }
 
+    fun disconnect() = connection.disconnect()
+
+    operator fun invoke() = loop {}
+
+    protected open fun loop() {}
+
+    fun loop(loop: C.() -> Unit) {
+        connect()
+        setup()
+        setupLambda?.invoke(this as C)
+        modules.forEach { it.setup() }
+        setupDone = true
+        while (connected) {
+            val sleepMs = minLoop.inWholeMilliseconds - measureTimeMillis {
+                listeners.forEach { it() }
+                loop()
+                loop(this as C)
+            }
+            if (sleepMs > 0) {
+                trace { "Sleeping $sleepMs ms." }
+                sleep(sleepMs)
+            }
+        }
+    }
+
     protected fun port() = Port(this, nextPort++).apply {
         ports[this.code] = this
+    }
 
+    fun printPinOut() { pinOut.forEach(::println) }
+
+    protected open fun setup() {}
+
+    fun setup(setup: C.() -> Unit): C {
+        setupLambda = setup
+        return this as C
     }
 
     override fun toString() = model
+
+    //#region Module constructors
+    /** Creates, changes, uses existing or default D2 pin to set up 1-Wire. */
+    fun dallasTemperature(bus : DigitalPin? = null) = attach(DallasTemperature(this, bus))
+
+    fun relay(pin : DigitalPin = freePin) = attach(Relay(this, pin))
+
+    fun switch(pin : DigitalPin = freePin) = attach(Switch(this, pin))
+    //#endregion
 }
 
 class DataLink(val clock: DigitalPin, val data: DigitalPin, val msb: Boolean) : Logger({}) {
@@ -153,7 +232,7 @@ class Loopback : Connection({}) {
     override fun writeByte(value: Byte) { buffer.add(value) }
 }
 
-class Port(val controller: Controller, val code: Char) : Logger({}) {
+class Port(val controller: Controller<*>, val code: Char) : Logger({}) {
     val controllerPinCount get() = controller.pins.size
     val id = "P$code"
     private val pinList = mutableListOf<Pin>()
@@ -167,7 +246,9 @@ class Port(val controller: Controller, val code: Char) : Logger({}) {
 
     fun interruptPwm(default: String? = null) = add(InterruptPwmPin(this, default.label("~D")))
 
-    fun pin(default: String? = null) = add(Pin(this, default.label()))
+    fun pin(description: String, default: String? = null) =
+        add(Pin(this, default.label(), description = description))
+            .also { controller.usedPins.getValue(it).add(description) }
 
     fun pwm(default: String? = null) = add(PwmPin(this, default.label("~D")))
 

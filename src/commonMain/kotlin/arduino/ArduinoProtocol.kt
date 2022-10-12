@@ -11,7 +11,7 @@ class ArduinoProtocol(override val connection: Connection) : Protocol {
         list
     }
 
-    override val version = 1
+    override val version = 2
 
     override val tag = "crap$version"
 
@@ -21,7 +21,7 @@ class ArduinoProtocol(override val connection: Connection) : Protocol {
         return procedure
     }
 
-    fun buildSketch(controller: Controller) =
+    fun buildSketch(controller: Uno) =
         with(mutableListOf("// Controller Remote Access Protocol (CRAP) version $version sketch for $controller")) {
             add("")
             add(template)

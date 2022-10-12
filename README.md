@@ -14,50 +14,50 @@ Kotlin multiplatform client library used to do remote procedure calls (RPC) to m
 - Arduino Relay Shield support
 - 1-wire support with following devices:
     - Dallas Digital Temperature Sensor e.g. DS18B20
+- Basic actuators: switch, relay
 
 ## Examples
+
+Examples are located at `src/jvmTest/kotlin/arduino` directory.
 
 ### Blink
 
 ```kotlin
-fun main() = with (Uno("COM3")) {           // Connect COM3 serial port and expects it to be Arduino Uno.
-    led.mode = Mode.Output                  // Call `pinMode(13, OUTPUT)`.
-    while (connected) {
-        led.high = !led.high                // Change the LED state by calling `digitalWrite(HIGH)` or `LOW`.
-        TimeUnit.SECONDS.sleep(1)           // Caller is waiting for a second.
+fun main() = Uno(1)                    // Connects Arduino Uno on 2nd serial.
+        .setup { led.output() }        // Sets built-in LED pin to output mode.
+        .loop { led.high = !led.high } // Changes its state on every second (by default).
+```
+
+### Blink
+
+```kotlin
+fun main() = Uno("COM3").setup {          // Uno is on COM3.
+    switch(d3).onChange {                 // Attaches switch to pin 3.
+        println("Switch changed to $it.") // Prints every state changes.
     }
-}
+}()                                       // Start's the loop
 ```
 
 ### Dallas Temperature Sensor
 ```kotlin
-fun main() = with (Uno("COM3")) {
-    val device = attachDallasTemperature()  // Set up 1-wire on first available pin (D2) and assumes DS18B20 on index 0.
-    var previous = 0f
-    while (connected) {
-        previous = device.celsius.apply {   // Read temperature using DallasTemperature library about 2 times a second.
-            if (previous != this)
-                println("Changed to $this °C.")
-        }
+fun main() = Uno().setup {                         // Connects default port.
+    dallasTemperature().onChange {                 // Set up 1-wire on first free pin (D2)
+            old, new -> println("$old -> $new °C") // Prints when temperature changes.
     }
-}
+}()
 ```
 
 ### Relays
 ```kotlin
-fun main() = with (Uno()) {                 // Connect default serial port.
-  with(attach4RelayShield()) {              // Set up pin modes for 4 Relay Shield.
-    while (connected) {
-      relays.shuffle()                      // Choose random relay.
-      relays.first().change()               // Activate or deactivate it.
-      TimeUnit.SECONDS.sleep(1)
-    }
-  }
-}
+fun main() = object : Uno(1) {                       // Uno can also be extended.
+    val relays = relayShield().relays                // Attaches 4 relay shield.
+    override fun loop() { relays.random().change() } // Change state on random relay.
+}()                                                  // Start's the loop
 ```
 
 ## Roadmap / Limitations
 
+- Better logging.
 - Packages aren't published to Maven Central yet.
 - Interrupt Service Routines can't be used, because they leave the connection in asynchronous state (now) and procedure pool is quite full.
 - Interrupts can't be disabled because they don't compile inside lambda.
@@ -68,7 +68,7 @@ fun main() = with (Uno()) {                 // Connect default serial port.
 2. Publish it to your local Maven using `./gradlew publishToMavenLocal`.
 3. Edit your project's `build.gradle.kts` file:
    1. Add `mavenLocal()` to your repositories.
-   2. Add `implementation("fi.papinkivi:crap:1.0.0")` to your `main` or `jvmMain` dependencies.
+   2. Add `implementation("fi.papinkivi:crap:2.1.0")` to your `main` or `jvmMain` dependencies.
 4. Install  [Arduino IDE](https://www.arduino.cc/en/software).
    1. Ensure that [OneWire](https://www.pjrc.com/teensy/td_libs_OneWire.html) and [DallasTemperature](https://github.com/milesburton/Arduino-Temperature-Control-Library) libraries are installed.
    2. Open `src/assembly/Uno3/Uno3.ino` sketch and upload it to your microcontroller.

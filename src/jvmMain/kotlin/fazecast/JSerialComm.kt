@@ -16,12 +16,17 @@ open class NonBlockingConnection(protected val port: SerialPort, func: () -> Uni
         return readLine()
     }
 
+    override fun disconnect() {
+        debug { "Close port." }
+        if (!port.closePort()) throw IllegalStateException("Unable to disconnect!")
+    }
+
     override fun readByte() = readBytes(1).first()
 
     override fun readBytes(bytes: Int) : ByteArray {
         while (available < bytes) {
             trace { "Sleeping $SLEEP_MS ms because $bytes bytes needed, but only $available available." }
-            Thread.sleep(SLEEP_MS)
+            sleep(SLEEP_MS)
         }
         val buffer = ByteArray(bytes)
         val read = port.readBytes(buffer, bytes.toLong())
@@ -36,7 +41,7 @@ open class NonBlockingConnection(protected val port: SerialPort, func: () -> Uni
         while (more) {
             while (available == 0) {
                 trace { "Sleeping $SLEEP_MS ms because no characters available." }
-                Thread.sleep(SLEEP_MS)
+                sleep(SLEEP_MS)
             }
             val buffer = ByteArray(available)
             val read = port.readBytes(buffer, buffer.size.toLong())

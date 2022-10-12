@@ -70,7 +70,7 @@ sealed class Procedure(val syntax: String, func: () -> Unit, val argBytes: Int =
 
     fun logCall(vararg args: Any) = debug { "Calling #$index '$syntax'${if (args.any()) "with arguments: ${args.joinToString()}" else '.'}" }
 
-    fun <T> logResult(result: T) = result.apply { debug { "#$index resulted: $result" } }
+    fun <T> logResult(result: T) = result.apply { debug { "#$index got: $result" } }
 
     protected fun writeProcedure() {
         connection.writeByte(procedure)

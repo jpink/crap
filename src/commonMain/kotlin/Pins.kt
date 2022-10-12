@@ -73,6 +73,15 @@ open class DigitalPin(
             }
         }
 
+    /** Set input pin mode to allow reading. */
+    fun input() { mode = Mode.Input }
+
+    /** Set input pin mode with pull-up resistor enabled to allow reading and defaults state to high. */
+    fun inputPullUp() { mode = Mode.InputPullUp }
+
+    /** Set output pin mode to allow writing. */
+    fun output() { mode = Mode.Output }
+
     fun pulseIn(
         /** Detect high pulse */
         high: Boolean,
@@ -128,6 +137,8 @@ open class Pin(
 
     /** Value or constant name in C++ code. */
     val id: String = port.controllerPinCount.toString(),
+
+    val description: String = ""
 ) : Logger(func) {
     /** Default usage abbreviation */
     val default = label.substringAfter('/')
@@ -137,6 +148,10 @@ open class Pin(
     init {
         trace {"Creating $label with code $id." }
     }
+
+    override fun hashCode() = id.hashCode()
+
+    override fun equals(other: Any?) = other is Pin && id == other.id
 
     override fun toString() = label
 }

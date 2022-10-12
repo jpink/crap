@@ -1,7 +1,6 @@
 package fi.papinkivi.crap.arduino
 
 import fi.papinkivi.crap.*
-import fi.papinkivi.crap.module.DallasTemperature
 
 /**
  * Arduino Uno revision 3
@@ -9,8 +8,8 @@ import fi.papinkivi.crap.module.DallasTemperature
  * [Features](https://docs.arduino.cc/hardware/uno-rev3)
  * [RX&TX LEDs](https://forum.arduino.cc/t/purpose-of-rx-and-tx-leds/318749/13)
  */
-class Uno(connection: Connection = ConnectionFactory.default)
-    : Controller({}, ID, "Arduino UNO R3", 'B') {
+open class Uno(connection: Connection = ConnectionFactory.default)
+    : Controller<Uno>({}, ID, "Arduino UNO R3", 'B') {
     constructor(descriptor: String) : this(ConnectionFactory(descriptor))
     constructor(index: Int) : this(ConnectionFactory(index))
 
@@ -73,10 +72,10 @@ class Uno(connection: Connection = ConnectionFactory.default)
 
     //#region Digital pins
     /** Reserved for USB Serial Receive (RX) */
-    val d0 = pd.pin("RX")
+    val d0 = pd.pin("USB serial receive", "RX")
 
     /** Reserved for USB Serial Transmit (TX) */
-    val d1 = pd.pin("TX")
+    val d1 = pd.pin("USB serial transmit", "TX")
 
     val d2 = pd.interrupt()
 
@@ -127,20 +126,16 @@ class Uno(connection: Connection = ConnectionFactory.default)
     val a5 = pc.analog("SCL")
     //#endregion
 
-    val reset = pc.pin("RESET")
+    val reset = pc.pin("Reset", "RST")
 
     init {
         if (procedures.size != PROCEDURES)
             throw IllegalStateException("Procedure count is ${procedures.size}, but expected to be $PROCEDURES!")
-        connect()
     }
 
-    fun attach4RelayShield() = attach(FourRelayShield(this))
-
-    /** Creates, changes, uses existing or default D2 pin to set up 1-Wire. */
-    fun attachDallasTemperature(bus : DigitalPin? = null) = attach(DallasTemperature(this, bus))
-
     fun buildSketch() = protocol.buildSketch(this)
+
+    fun relayShield() = attach(FourRelayShield(this))
 
     companion object {
         const val ID = "Uno3"

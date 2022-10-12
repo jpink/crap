@@ -1,5 +1,8 @@
 package fi.papinkivi.crap
 
+val BYTE_0 = 0.toByte()
+val BYTE_1 = 1.toByte()
+
 val Byte.hex get() = "%02x".format(this)
 
 /**
@@ -30,9 +33,9 @@ val ByteArray.uInt get() = int.toUInt()
 
 val ByteArray.uShort get() = short.toUShort()
 
-val Boolean.byte get() = (if (this) 1 else 0).toByte()
+val Boolean.byte get() = if (this) BYTE_1 else BYTE_0
 
-val Byte.boolean get() = equals(1)
+val Byte.boolean get() = equals(BYTE_1)
 
 val Int.bytes get() = ByteArray(4) { shr(8 * it).toByte() }
 
